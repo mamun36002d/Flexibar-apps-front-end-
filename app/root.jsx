@@ -5,13 +5,12 @@ import {
   Scripts,
   ScrollRestoration,
   useLoaderData,
-  Link, // Link ইম্পোর্ট করা হয়েছে
+  Link,
 } from "react-router";
 import { AppProvider } from "@shopify/polaris";
 import "@shopify/polaris/build/esm/styles.css";
 import enTranslations from "@shopify/polaris/locales/en.json";
 
-// Polaris এর লিঙ্ক হ্যান্ডলিং এর জন্য এই ফাংশনটি জরুরি
 function AppBridgeLink({ url, children, external, ...rest }) {
   const IS_EXTERNAL_LINK_REGEX = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
   if (external || IS_EXTERNAL_LINK_REGEX.test(url)) {
@@ -28,9 +27,7 @@ function AppBridgeLink({ url, children, external, ...rest }) {
   );
 }
 
-// এই লোডারটি দরকার যাতে শপিফাই এর API Key ক্লায়েন্ট সাইডে পাওয়া যায়
 export async function loader({ request }) {
-  // এখানে আপনার authentication চেক বা এনভায়রনমেন্ট ভেরিয়েবল রিটার্ন করতে পারেন
   return { apiKey: process.env.SHOPIFY_API_KEY };
 }
 
@@ -51,9 +48,9 @@ export default function App() {
         <Links />
       </head>
       <body>
-        <AppProvider 
-          i18n={enTranslations} 
-          linkComponent={AppBridgeLink} // Polaris কে লিঙ্ক চিনিয়ে দেওয়া হলো
+        <AppProvider
+          i18n={enTranslations}
+          linkComponent={AppBridgeLink}
         >
           <Outlet />
         </AppProvider>
