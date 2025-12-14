@@ -1,0 +1,374 @@
+
+{% schema %}
+{
+  "name": "Flexibar",
+  "target": "body",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "enabled",
+      "label": "Enable embed",
+      "default": true
+    }
+  ]
+}
+{% endschema %}
+
+{% if block.settings.enabled %}
+<link href="https://fonts.googleapis.com/css2?family=Rock+3D&family=Madimi+One&family=Angkor&family=Josefin+Sans&family=Josefin+Slab&family=Roboto&family=Lobster&family=Open+Sans&family=Crafty+Girls&family=Mystery+Quest&family=Montserrat&family=Raleway&family=Anton&family=Encode+Sans+Expanded&display=swap" rel="stylesheet">
+{{ 'flexibar-v3.css' | asset_url | stylesheet_tag }}
+
+{% assign storedomain = shop.permanent_domain | split: '.' | first %}
+
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+
+    if (window.flexibarFetching) return;
+    window.flexibarFetching = true;
+
+    function checkDeviceType(targetedDevice) {
+      if (!targetedDevice || targetedDevice === "all") return true;
+
+      const userAgent = navigator.userAgent.toLowerCase();
+
+      const isIPad = /ipad/.test(userAgent);
+      const isAndroid = /android/.test(userAgent);
+      const isMobile = /mobi|iphone|ipod|android/.test(userAgent);
+      const isTablet = isIPad || (isAndroid && !/mobile/.test(userAgent));
+      const isDesktop = !isMobile && !isTablet;
+
+      const activeDevice = isDesktop
+        ? "desktop"
+        : isTablet
+        ? "tablet"
+        : isMobile
+        ? "mobile"
+        : "unknown";
+
+      const allowedDevices = targetedDevice.toLowerCase().split(",").map((d) => d.trim());
+
+      return allowedDevices.includes(activeDevice);
+    }
+
+    function getTimeRemaining(targetDateTime) {
+      const now = new Date();
+      const diff = targetDateTime - now;
+
+      if (diff <= 0) {
+        return { days: "00", hours: "00", minutes: "00", seconds: "00", isExpired: true };
+      }
+
+      const seconds = String(Math.floor((diff / 1000) % 60)).padStart(2, "0");
+      const minutes = String(Math.floor((diff / 1000 / 60) % 60)).padStart(2, "0");
+      const hours = String(Math.floor((diff / (1000 * 60 * 60)) % 24)).padStart(2, "0");
+      const days = String(Math.floor(diff / (1000 * 60 * 60 * 24))).padStart(2, "0");
+
+      return { days, hours, minutes, seconds, isExpired: false };
+    }
+
+    function startCountdownTimer(containerId, targetDateTime, template, style) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+
+      let timer; // <-- Declare timer here
+
+      const updateClock = () => {
+        const time = getTimeRemaining(targetDateTime);
+        
+        const html = template.html
+          .replace(/{% raw %}{{name}}{% endraw %}/g, template.name)
+          .replace(/{% raw %}{{days}}{% endraw %}/g, time.days)
+          .replace(/{% raw %}{{hours}}{% endraw %}/g, time.hours)
+          .replace(/{% raw %}{{minutes}}{% endraw %}/g, time.minutes)
+          .replace(/{% raw %}{{seconds}}{% endraw %}/g, time.seconds)
+          .replace(/{% raw %}{{color}}{% endraw %}/g, style.color)
+          .replace(/{% raw %}{{background}}{% endraw %}/g, style.background)
+          .replace(/{% raw %}{{shadow}}{% endraw %}/g, style.shadow)
+          .replace(/{% raw %}{{fontFamily}}{% endraw %}/g, style.fontFamily)
+          .replace(/{% raw %}{{fontSize}}{% endraw %}/g, style.fontSize)
+          .replace(/{% raw %}{{fontWeight}}{% endraw %}/g, style.fontWeight);
+
+        el.innerHTML = html;
+
+        if (time.isExpired) {
+          clearInterval(timer);
+          return;
+        }
+      };
+
+      timer = setInterval(updateClock, 1000);
+      updateClock();
+    }
+
+
+    function reactStyleToCSS(styleObj) {
+      const kebab = str => str.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
+      const lines = Object.entries(styleObj).map(([key, value]) => {
+        return `  ${kebab(key)}: ${value};`;
+      });
+      return `\n${lines.join('\n')}\n`;
+    }
+
+    function showSlide(slides, index) {
+      slides.forEach((slide, i) => {
+        slide.classList.remove('active');
+      });
+      slides[index].classList.add('active');
+    }
+
+    function startSlideShow(slides) {
+      let currentIndex = 0;
+      const duration = 3000;
+      setInterval(() => {
+        currentIndex = (currentIndex + 1) % slides.length;
+        showSlide(slides, currentIndex);
+      }, duration);
+    }
+
+    function getBrowserZone() {
+      const offset = new Date().getTimezoneOffset(); // e.g. -360 for UTC+6
+      const sign = offset <= 0 ? "+" : "-";
+      const abs = Math.abs(offset);
+      const hours = String(Math.floor(abs / 60)).padStart(2, "0");
+      const minutes = String(abs % 60).padStart(2, "0");
+      return `${sign}${hours}:${minutes}`;
+    };
+
+    function parseWithZone(dateStr, timeStr, zoneOffset) {
+      if (!dateStr || !timeStr || !zoneOffset) return null;
+
+      // Extract hours, minutes
+      const [hours, minutes] = timeStr.split(":").map(Number);
+      const [year, month, day] = dateStr.split("-").map(Number);
+
+      // Create base date in UTC
+      const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes));
+
+      // Apply timezone offset in milliseconds
+      const [, sign, hh, mm] = zoneOffset.match(/([+-])(\d{2}):(\d{2})/) || [];
+      const offsetMinutes = parseInt(hh) * 60 + parseInt(mm);
+      const offsetMs = offsetMinutes * 60 * 1000;
+
+      return new Date(utcDate.getTime() + (sign === "+" ? -offsetMs : offsetMs));
+    }
+
+    async function parseAnnouncementData() {
+
+      try {
+        const res = await fetch('{{ "api-response.json" | asset_url }}');
+        const json = await res.json();
+        const data = json?.data;
+        console.log('Fetched announcement data:', data);
+        if (!data) {
+          return [];
+        }
+
+        // Parse announcement settings
+        const announcementSettings = data.announcementSettings || {};
+
+        // Parse and map each bar setting
+        const barSettings = (data.barSettings || []).map((barSettingStr) => {
+          try {
+            return {
+              barSettings: barSettingStr.barSettings,
+              barId: barSettingStr.barId
+            };
+          } catch (e) {
+            console.warn("Invalid JSON in barSetting:", barSettingStr);
+            return null;
+          }
+        }).filter(Boolean); // remove any nulls from failed JSON parsing
+
+        // Final structured object
+        const parsedResult = {
+          title: data.title,
+          barSettings,
+          announcementSettings,
+          barMessageTranslations: data?.barMessageTranslations || [],
+          scheduleType: data.scheduleType,
+          scheduleDays: data.scheduleDays,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          isSchedule: data.isSchedule,
+          countryCode: `{{ localization.country.iso_code }}`,
+          languageCode: `{{ localization.language.iso_code }}`,
+        };
+        return parsedResult;
+      } catch (error) {
+        console.error("Failed to fetch or parse announcement data:", error);
+        return [];
+      }
+    }
+
+    parseAnnouncementData().then(announcementDetails => {
+      if (announcementDetails && announcementDetails.barSettings) {
+        
+        
+        // Once the data is fetched, inject dynamic conditions for showing the bar
+        const announcementSettings = announcementDetails?.announcementSettings;
+        const scheduleDays = announcementDetails?.scheduleDays ? announcementDetails?.scheduleDays.split(',') : [];
+        const scheduleType = announcementDetails?.scheduleType;
+        const currentDay = new Date().toLocaleString('en-us', { weekday: 'long' });
+        const startDate = announcementDetails?.startDate?.date;
+        const endDate = announcementDetails?.endDate?.date;
+        const startTime = announcementDetails?.startDate?.time;
+        const endTime = announcementDetails?.endDate?.time;
+        const countryCode = announcementDetails.countryCode;
+        const languageCode = announcementDetails.languageCode;
+        const barMessageTranslations = announcementDetails.barMessageTranslations;
+
+        const currentDate = new Date();
+        const zone = getBrowserZone();
+
+        const startDateTime = parseWithZone(startDate, startTime, zone);
+        const endDateTime = parseWithZone(endDate, endTime, zone);
+
+
+        // 1. Check if the country code matches any of the keywords
+        const countries = announcementSettings?.countries || [];
+        const isCountryAllowed = !countries.length ? true : countries.some(country => country === countryCode);
+
+        // 2. Check if today is within the schedule days
+        const isDayAllowed = (scheduleType !== 'Repeat') ? true : scheduleDays.includes(currentDay);
+
+        // 3. Check if today's date is within the start and end date range
+        const isDateInRange =
+          (!startDateTime || !endDateTime)
+            ? true
+            : currentDate >= startDateTime && currentDate <= endDateTime;
+            
+        // 4. Check if the device is the correct type (desktop, mobile, etc.)
+        const targetedDevice = announcementSettings?.targetedDevice || '';
+        const isDeviceAllowed = checkDeviceType(targetedDevice);
+
+        // 5. Check if the page is allowed for this announcement
+        const allowedPages = announcementSettings?.pages.map((page) => {
+          page = page.toLowerCase()
+          page = page == 'home' ? 'index' : page
+          return page
+        }) || [];
+        const isPageAllowed = announcementSettings?.pages.length ? allowedPages.includes("{{template.name}}") || allowedPages.includes("{{page_title | downcase}}") : true;
+
+        if (isPageAllowed && isCountryAllowed && isDayAllowed && isDateInRange && isDeviceAllowed) {
+          console.log('rendering logic passed')
+        } else {
+          console.log('rendering logic failed', {isPageAllowed , isCountryAllowed, isDayAllowed , isDateInRange , isDeviceAllowed})
+          return;
+        }
+
+
+        const totalBarsCount = announcementDetails.barSettings.length;
+        const barTranslations = announcementDetails?.barMessageTranslations || [];
+
+        for (const {barId, barSettings} of announcementDetails.barSettings) {
+          const { barDesignSettings, buttonSettings, countdownSettings, textSettings } = barSettings;
+
+          barDesignSettings.style.width = barDesignSettings.style.width + '%';
+          barDesignSettings.style.height = 'auto';
+          barDesignSettings.style.padding = barDesignSettings.style.padding + 'px';
+          barDesignSettings.style.borderWidth = barDesignSettings.style.borderWidth + 'px';
+          barDesignSettings.style.borderRadius = barDesignSettings.style.borderRadius + 'px';
+          barDesignSettings.style.justifyContent = barDesignSettings.style.justifyContent  == null ? 'normal' : barDesignSettings.style.justifyContent;
+          barDesignSettings.style.marginLeft = barDesignSettings.style.marginLeft + '%';
+          barDesignSettings.style.cursor = barDesignSettings.clickable ? "pointer" : 'default';
+          
+          textSettings.style.fontSize = textSettings.style.fontSize + 'px';
+
+          buttonSettings.style.borderRadius = buttonSettings.style.borderRadius + 'px';
+
+          const { animation, ...btnStyle } = buttonSettings.style;
+
+          const redirectUrl = barDesignSettings.clickable ? barDesignSettings.redirectUrl : '';
+
+          const hasValidCountdown =
+            countdownSettings?.isSelected &&
+            countdownSettings.targetDate.date &&
+            countdownSettings.targetDate.time;
+
+          const targetDateTime = hasValidCountdown
+            ? parseWithZone(countdownSettings.targetDate.date, countdownSettings.targetDate.time, zone)
+            : null;
+
+          const timeParts = hasValidCountdown ? getTimeRemaining(targetDateTime) : {};
+
+          const countdownId = `countdown-${Math.random().toString(36).substr(2, 9)}`;
+
+          const countdownHTML = hasValidCountdown
+            ? `<span id="${countdownId}"></span>`
+            : "";
+
+          let rootMessage = textSettings.message;
+
+          if (barMessageTranslations.length) {
+            const translatedMessage = barMessageTranslations.find(
+              translation => translation.barId === barId && translation.languageCode === (languageCode.includes('-') ?  languageCode.split('-')[0] : languageCode)
+            );
+            if (translatedMessage) {
+              rootMessage = translatedMessage.translationMessage;
+            }
+          }
+
+          const message = rootMessage + (hasValidCountdown ? countdownHTML : "");
+
+          const totalHTML = `
+            <div 
+              data-url="${redirectUrl || ''}" 
+              style="${reactStyleToCSS(barDesignSettings.style)}" 
+              class="${barDesignSettings.animation || ''} ${barDesignSettings.position || ''} flexibar-redirect-area ${totalBarsCount > 1 ? 'flexibar-slideshow-slide' : ''}">
+              
+              <span 
+                style="${reactStyleToCSS(textSettings.style)}; width: 100%;">
+                ${message}
+              </span>
+
+              ${buttonSettings.isSelected ? `
+                <a href="${buttonSettings.href || '#'}" target="_blank">
+                  <button 
+                    class="${animation}" 
+                    style="${reactStyleToCSS(btnStyle)}; cursor: pointer; width: max-content; padding: 5px; font-size: 15px; margin-left: 10px; border-color: transparent;">
+                    ${buttonSettings.content}
+                  </button>
+                </a>
+              ` : ''}
+            </div>
+          `;
+
+
+          switch (barDesignSettings.position) {
+            case 'top':
+            case 'sticky-top':
+              document.body.insertAdjacentHTML('afterbegin', totalHTML);
+              break;
+            case 'bottom':
+            case 'sticky-bottom':
+              document.body.insertAdjacentHTML('beforeend', totalHTML);
+              break;
+          }
+
+          document.querySelectorAll('.flexibar-redirect-area').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const redirectUrl = btn.getAttribute('data-url');
+              if (redirectUrl && redirectUrl != '' && barDesignSettings.clickable) window.open(redirectUrl, '_blank');
+            });
+          });
+
+          if (hasValidCountdown) {
+            startCountdownTimer(
+              countdownId,
+              targetDateTime,
+              countdownSettings.template,
+              countdownSettings.style
+            );
+          }
+        }
+        
+        if (totalBarsCount > 1) {
+          startSlideShow(document.querySelectorAll('.flexibar-slideshow-slide'));
+        }
+
+      }
+    });
+  });
+</script>
+{% endif %}
