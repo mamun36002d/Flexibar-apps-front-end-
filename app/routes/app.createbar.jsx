@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Page, Layout, Card, TextField, Tabs, Select, ChoiceList, BlockStack, InlineStack,
   Text, Button, Collapsible, Box, InlineGrid, Divider, Popover, ColorPicker, LegacyCard,
@@ -33,28 +33,40 @@ const animationKeyframes = `
   padding: 12px 20px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 16px;
   box-sizing: border-box;
   transition: all 0.3s ease;
-  min-height: 48px;
+  min-height: auto;
+  height: auto;
+  flex-wrap: nowrap; /* Default: Don't wrap unless necessary */
 }
 
+/* Message should be flexible but not stretch unnecessarily */
 .flexibar-message {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap; /* Default single line for desktop */
+  flex: 0 1 auto; /* Can shrink but won't grow */
+  white-space: nowrap; /* Keep on one line by default */
+  font-size: 15px;
+  line-height: 1.5;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 15px;
-  line-height: 1.4;
+}
+
+/* Only wrap text when it actually doesn't fit */
+@media (max-width: 900px) {
+  .flexibar-message {
+    white-space: normal; /* Allow wrapping on smaller screens */
+    overflow: visible;
+    text-overflow: clip;
+  }
 }
 
 .flexibar-actions {
   display: flex;
   gap: 10px;
   align-items: center;
-  flex-shrink: 0;
+  flex-shrink: 0; /* Actions never shrink */
+  flex-wrap: nowrap;
 }
 
 .flexibar-countdown {
@@ -105,7 +117,7 @@ const animationKeyframes = `
 /* ===== MOBILE MODE STYLES (Triggered by .is-mobile class) ===== */
 /* This forces the layout to break even inside a desktop browser preview */
 .flexibar-announcement-bar.is-mobile {
-  padding: 15px 14px !important;
+  padding: 12px 14px !important;
   gap: 10px !important;
   flex-direction: column !important; /* Forces vertical stacking */
   align-items: center !important;
@@ -118,19 +130,20 @@ const animationKeyframes = `
 .flexibar-announcement-bar.is-mobile .flexibar-message {
   flex: 0 0 auto !important;
   width: 100% !important;
+  min-width: auto !important;
   white-space: normal !important; /* FORCE TEXT WRAP */
   overflow: visible !important;
   text-overflow: clip !important;
   text-align: center !important;
   font-size: 14px !important;
   line-height: 1.5 !important;
-  margin-bottom: 8px !important; /* Space between text and button */
+  margin-bottom: 10px !important; /* Space between text and actions */
 }
 
 .flexibar-announcement-bar.is-mobile .flexibar-actions {
   width: 100% !important;
   justify-content: center !important;
-  gap: 10px !important;
+  gap: 8px !important;
   flex-wrap: wrap !important;
 }
 
@@ -138,6 +151,89 @@ const animationKeyframes = `
   padding: 3px 6px !important;
   min-width: 32px !important;
   font-size: 0.85em !important;
+}
+
+/* ===== RESPONSIVE BREAKPOINTS ===== */
+/* Tablet and smaller - wrap to vertical layout */
+@media (max-width: 768px) {
+  .flexibar-announcement-bar:not(.is-mobile) {
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+  
+  .flexibar-announcement-bar:not(.is-mobile) .flexibar-message {
+    width: 100%;
+    text-align: center;
+    white-space: normal;
+  }
+  
+  .flexibar-announcement-bar:not(.is-mobile) .flexibar-actions {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Small desktop - allow text to wrap if really needed */
+@media (min-width: 769px) and (max-width: 1100px) {
+  .flexibar-announcement-bar:not(.is-mobile) {
+    gap: 14px;
+  }
+  
+  .flexibar-message {
+    max-width: 55%;
+  }
+}
+
+/* Very tight spaces - wrap everything */
+@media (max-width: 600px) {
+  .flexibar-announcement-bar:not(.is-mobile) {
+    padding: 12px;
+    gap: 10px;
+  }
+  
+  .flexibar-announcement-bar:not(.is-mobile) .flexibar-countdown-block {
+    padding: 3px 6px;
+    min-width: 32px;
+    font-size: 0.85em;
+  }
+}
+
+
+/* ===== RESPONSIVE BREAKPOINT FOR DESKTOP ===== */
+/* When the bar gets narrow (like in a smaller preview), wrap actions to next line */
+@media (max-width: 768px) {
+  .flexibar-announcement-bar:not(.is-mobile) {
+    padding: 14px 16px;
+  }
+  
+  .flexibar-announcement-bar:not(.is-mobile) .flexibar-message {
+    min-width: 150px;
+    width: 100%;
+  }
+  
+  .flexibar-announcement-bar:not(.is-mobile) .flexibar-actions {
+    width: 100%;
+    justify-content: center;
+    margin-top: 8px;
+  }
+}
+
+/* ===== COMPACT MODE - For when content + actions don't fit in one line ===== */
+.flexibar-announcement-bar.compact-mode {
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  padding: 14px 20px !important;
+}
+
+.flexibar-announcement-bar.compact-mode .flexibar-message {
+  width: 100% !important;
+  margin-bottom: 10px !important;
+}
+
+.flexibar-announcement-bar.compact-mode .flexibar-actions {
+  width: 100% !important;
+  justify-content: flex-end !important;
 }
 `;
 
@@ -279,17 +375,41 @@ const EcommerceSkeleton = React.memo(({ mode = 'desktop' }) => {
   );
 });
 
-// --- UPDATED TheBar COMPONENT ---
-// Key Fix: Logic to apply .is-mobile class based on viewMode prop
+// --- UPDATED TheBar COMPONENT WITH SMART WRAPPING ---
 const TheBar = ({ content, barBgColor, backgroundType, gradientColorFrom, gradientColorTo, gradientAngle, fontFamily, fontColor, fontSize, isBold, viewMode }) => {
   if (!content) return null;
   const [countdown, setCountdown] = useState(() => calculateCountdown(content));
+  const barRef = useRef(null);
+  const [isCompact, setIsCompact] = useState(false);
 
   useEffect(() => {
     if (!content.showCountdown) return;
     const interval = setInterval(() => { setCountdown(calculateCountdown(content)); }, 1000);
     return () => clearInterval(interval);
   }, [content.showCountdown, content.targetDate, content.targetTimeH, content.targetTimeM, content.targetTimeAmPm]);
+
+  // Check if content needs to wrap
+  useEffect(() => {
+    const checkLayout = () => {
+      if (!barRef.current || viewMode === 'mobile') return;
+      
+      const barWidth = barRef.current.offsetWidth;
+      const messageEl = barRef.current.querySelector('.flexibar-message');
+      const actionsEl = barRef.current.querySelector('.flexibar-actions');
+      
+      if (messageEl && actionsEl) {
+        const messageWidth = messageEl.scrollWidth;
+        const actionsWidth = actionsEl.scrollWidth;
+        const totalNeeded = messageWidth + actionsWidth + 100; // Add gap and padding
+        
+        setIsCompact(totalNeeded > barWidth);
+      }
+    };
+
+    checkLayout();
+    window.addEventListener('resize', checkLayout);
+    return () => window.removeEventListener('resize', checkLayout);
+  }, [content, viewMode]);
 
   let backgroundStyle = barBgColor;
   if (backgroundType === 'gradient') {
@@ -304,12 +424,14 @@ const TheBar = ({ content, barBgColor, backgroundType, gradientColorFrom, gradie
   if (content.countdownShowDays) countdownBlocks.push({ label: content.countdownShowLabels ? 'Days' : '', value: countdown.days });
   countdownBlocks.push({ label: content.countdownShowLabels ? 'Hours' : '', value: countdown.hours }, { label: content.countdownShowLabels ? 'Minutes' : '', value: countdown.minutes }, { label: content.countdownShowLabels ? 'Seconds' : '', value: countdown.seconds });
 
-  // *** KEY FIX: Add 'is-mobile' class if viewMode is mobile ***
+  // Build class names
   const mobileClass = viewMode === 'mobile' ? 'is-mobile' : '';
+  const compactClass = isCompact && viewMode !== 'mobile' ? 'compact-mode' : '';
 
   return (
     <div 
-      className={`flexibar-announcement-bar ${mobileClass}`}
+      ref={barRef}
+      className={`flexibar-announcement-bar ${mobileClass} ${compactClass}`}
       style={{ 
         background: backgroundStyle, 
         color: fontColor, 
@@ -340,7 +462,10 @@ const TheBar = ({ content, barBgColor, backgroundType, gradientColorFrom, gradie
         {content.showCountdown && (
           <div className="flexibar-countdown">
             {countdownBlocks.map((item, idx) => (
-              <div key={idx} className="flexibar-countdown-block">
+              <div key={idx} className="flexibar-countdown-block" style={{
+                background: content.countdownBgColor || 'rgba(0, 0, 0, 0.2)',
+                color: content.countdownTextColor || fontColor
+              }}>
                 <span className="flexibar-countdown-value">{item.value}</span>
                 {item.label && <span className="flexibar-countdown-label">{item.label}</span>}
               </div>
@@ -439,7 +564,7 @@ const CleanPreviewContainer = ({ content, viewMode, barPosition = 'top', barBgCo
         boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', 
         border: '1px solid #E5E7EB', 
         borderRadius: isMobile ? '16px' : '8px', 
-        overflow: 'hidden', 
+        overflow: 'visible', 
         position: 'relative', 
         display: 'flex', 
         flexDirection: 'column'
@@ -447,7 +572,7 @@ const CleanPreviewContainer = ({ content, viewMode, barPosition = 'top', barBgCo
         
         {/* Top Bar Container */}
         {barPosition === 'top' && (
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', minHeight: '48px', background: '#fff' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', minHeight: 'auto', background: '#fff', overflow: 'visible' }}>
             
             {hasMultipleContents && slideMode === 'manual' && (
               <button
@@ -463,13 +588,13 @@ const CleanPreviewContainer = ({ content, viewMode, barPosition = 'top', barBgCo
               >‹</button>
             )}
             
-            <div style={{ flex: 1, overflow: 'hidden', position: 'relative', minHeight: '48px' }}>
+            <div style={{ flex: 1, overflow: 'visible', position: 'relative', minHeight: "auto" }}>
               <div style={slideStyle}>
                 <TheBar 
                   content={displayContent} barBgColor={barBgColor} backgroundType={backgroundType} 
                   gradientColorFrom={gradientColorFrom} gradientColorTo={gradientColorTo} gradientAngle={gradientAngle} 
                   fontFamily={fontFamily} fontColor={fontColor} fontSize={fontSize} isBold={isBold} 
-                  viewMode={viewMode} // Passing viewMode
+                  viewMode={viewMode}
                 />
               </div>
             </div>
@@ -494,7 +619,7 @@ const CleanPreviewContainer = ({ content, viewMode, barPosition = 'top', barBgCo
         
         {/* Bottom Bar Container */}
         {barPosition === 'bottom' && (
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', minHeight: '48px' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', minHeight: "auto" }}>
              
              {hasMultipleContents && slideMode === 'manual' && (
               <button
@@ -510,13 +635,13 @@ const CleanPreviewContainer = ({ content, viewMode, barPosition = 'top', barBgCo
               >‹</button>
             )}
             
-            <div style={{ flex: 1, overflow: 'hidden', position: 'relative', minHeight: '48px' }}>
+            <div style={{ flex: 1, overflow: 'visible', position: 'relative', minHeight: "auto" }}>
               <div style={slideStyle}>
                 <TheBar 
                   content={displayContent} barBgColor={barBgColor} backgroundType={backgroundType} 
                   gradientColorFrom={gradientColorFrom} gradientColorTo={gradientColorTo} gradientAngle={gradientAngle} 
                   fontFamily={fontFamily} fontColor={fontColor} fontSize={fontSize} isBold={isBold} 
-                  viewMode={viewMode} // Passing viewMode
+                  viewMode={viewMode}
                 />
               </div>
             </div>
@@ -670,8 +795,8 @@ function CreateBarPage() {
         linkText: activeContent.linkText || 'Click Here',
         linkUrl: activeContent.linkUrl || 'https://',
         linkColor: activeContent.linkColor || '#D56767',
-        linkUnderline: activeContent.linkUnderline !== false, // default true
-        linkNewTab: activeContent.linkNewTab !== false // default true
+        linkUnderline: activeContent.linkUnderline !== false,
+        linkNewTab: activeContent.linkNewTab !== false
     });
     setIsLinkModalOpen(true);
   };
@@ -681,7 +806,6 @@ function CreateBarPage() {
   };
 
   const handleInsertLink = () => {
-      // Update real content with temp data
       updateContentField(activeIndex, 'hasLink', true);
       updateContentField(activeIndex, 'linkText', tempLinkData.linkText);
       updateContentField(activeIndex, 'linkUrl', tempLinkData.linkUrl);
@@ -833,7 +957,6 @@ function CreateBarPage() {
                               <BlockStack gap="200">
                                 <TextField label="Message" value={activeContent.message} onChange={(val) => updateContentField(activeIndex, 'message', val)} autoComplete="off" multiline={1} />
                                 <InlineStack gap="200">
-                                  {/* --- TRIGGER LINK MODAL --- */}
                                   <Button icon={LinkIcon} size="slim" onClick={handleOpenLinkModal}>Link</Button>
                                   <Button icon={MagicIcon} size="slim">AI Message Generation</Button>
                                   <Button icon={LanguageIcon} size="slim">AI Translation</Button>
@@ -950,7 +1073,7 @@ function CreateBarPage() {
                           )}
                           <BlockStack gap="200"><Select label="Animation" options={animationOptions} value={contents[0]?.animationType || 'bounce'} onChange={handleDesignAnimationChange} /></BlockStack>
                           <InlineStack align="space-between" blockAlign="end">
-                              <BlockStack gap="200"><Text variant="bodyMd" as="span">Bar Position</Text><div style={{ width: '200px', borderRadius: '8px', background: '#f1f1f1', display: 'flex', overflow: 'hidden', border: '1px solid #dcdcdc' }}><button type="button" onClick={() => setBarPosition('top')} style={{ flex: 1, padding: '8px 12px', border: 'none', background: barPosition === 'top' ? '#ffffff' : 'transparent', fontSize: '13px', cursor: 'pointer', fontWeight: barPosition === 'top' ? '600' : '400', boxShadow: barPosition === 'top' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>Top</button><button type="button" onClick={() => setBarPosition('bottom')} style={{ flex: 1, padding: '8px 12px', border: 'none', background: barPosition === 'bottom' ? '#ffffff' : 'transparent', fontSize: '13px', cursor: 'pointer', fontWeight: barPosition === 'bottom' ? '600' : '400', boxShadow: barPosition === 'bottom' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>Bottom</button></div></BlockStack>
+                              <BlockStack gap="200"><Text variant="bodyMd" as="span">Bar Position</Text><div style={{ width: '200px', borderRadius: '8px', background: '#f1f1f1', display: 'flex', overflow: 'visible', border: '1px solid #dcdcdc' }}><button type="button" onClick={() => setBarPosition('top')} style={{ flex: 1, padding: '8px 12px', border: 'none', background: barPosition === 'top' ? '#ffffff' : 'transparent', fontSize: '13px', cursor: 'pointer', fontWeight: barPosition === 'top' ? '600' : '400', boxShadow: barPosition === 'top' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>Top</button><button type="button" onClick={() => setBarPosition('bottom')} style={{ flex: 1, padding: '8px 12px', border: 'none', background: barPosition === 'bottom' ? '#ffffff' : 'transparent', fontSize: '13px', cursor: 'pointer', fontWeight: barPosition === 'bottom' ? '600' : '400', boxShadow: barPosition === 'bottom' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>Bottom</button></div></BlockStack>
                               <BlockStack gap="100" align="center"><Text variant="bodyMd" as="span">Sticky</Text><div onClick={() => setIsSticky((v) => !v)} style={{ width: '40px', height: '22px', background: isSticky ? '#108043' : '#ccc', borderRadius: '20px', position: 'relative', cursor: 'pointer', transition: '0.25s', marginTop: '4px' }}><div style={{ width: '18px', height: '18px', background: 'white', borderRadius: '50%', position: 'absolute', top: '2px', left: isSticky ? '20px' : '2px', transition: '0.25s' }} /></div></BlockStack>
                           </InlineStack>
                         </BlockStack>
