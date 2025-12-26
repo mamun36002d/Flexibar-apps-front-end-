@@ -1,5 +1,3 @@
-
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Page, Layout, Card, TextField, Tabs, Select, ChoiceList, BlockStack, InlineStack,
@@ -33,7 +31,6 @@ const countryList = [
 
 // --- CSS STYLES ---
 const stylesAndAnimations = `
-/* Import Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Montserrat:wght@400;700&family=Open+Sans:wght@400;700&family=Poppins:wght@400;700&family=Roboto:wght@400;700&display=swap');
 
 @keyframes flexibar-bounce { 
@@ -358,11 +355,13 @@ function renderCountdownHtml(templateHtml, data) {
   });
 }
 
+// *** CHANGE 1: Added isMessageDirty to empty content ***
 function createEmptyContent(index) {
   return {
     id: `${Date.now()}-${index}`,
     label: `Content ${index}`,
     message: 'NEW COLLECTION LAUNCHED. 20% Flat Discount.',
+    isMessageDirty: false, // NEW: track if user manually edited
     showButton: true,
     buttonText: 'Shop Now',
     buttonUrl: '',
@@ -915,7 +914,7 @@ content,
               display: 'inline-block', width: '8px', height: '8px', 
               background: '#10B981', borderRadius: '50%',
               animation: 'flexibar-pulse 2s ease-in-out infinite'
-            }}></span>
+            }}></span >
             Marquee • {totalContents} messages
           </div>
         )}
@@ -1021,16 +1020,22 @@ function CreateBarPage() {
   const formatDateDisplay = (date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   const handleTabChange = useCallback((index) => setSelectedTab(index), []);
+
+  // *** CHANGE 2: Updated updateContentField to set isMessageDirty flag ***
   const updateContentField = (index, field, value) => { 
     setContents((prev) => { 
       const copy = [...prev]; 
-      copy[index] = { ...copy[index], [field]: value }; 
+      if (field === 'message') {
+        copy[index] = { ...copy[index], [field]: value, isMessageDirty: true }; 
+      } else {
+        copy[index] = { ...copy[index], [field]: value }; 
+      }
       return copy; 
     }); 
   };
+
   const triggerPreviewLoading = () => { setIsLoadingPreview(true); setTimeout(() => setIsLoadingPreview(false), 400); };
     
-  // CHANGED: Update both editor AND preview when user manually clicks
   const handleChangeContent = (i) => { 
     setActiveIndex(i); 
     setPreviewIndex(i); 
@@ -1060,7 +1065,6 @@ function CreateBarPage() {
   const handleChangePreviewMode = (mode) => { setPreviewMode(mode); };
   const handleDesignAnimationChange = (val) => setContents(p => p.map(c => ({...c, animationType: val})));
     
-  // CHANGED: Update only preview index for auto-slide/arrows
   const handlePrevContent = () => {
     const newIndex = previewIndex === 0 ? contents.length - 1 : previewIndex - 1;
     setPreviewIndex(newIndex);
@@ -1199,6 +1203,7 @@ function CreateBarPage() {
       setIsLinkModalOpen(false);
   };
 
+  // *** CHANGE 3: Updated handleTemplateSelection logic to respect dirty message ***
   const handleTemplateSelection = (val) => {
     setTemplate(val);
     const selected = PREDEFINED_TEMPLATES.find(t => t.value === val);
@@ -1207,9 +1212,16 @@ function CreateBarPage() {
 
     setContents(prev => {
         const copy = [...prev];
+        const currentContent = copy[activeIndex];
+
+        // LOGIC: If user has manually edited, keep current. Otherwise use template default.
+        const messageToUse = currentContent.isMessageDirty 
+                             ? currentContent.message 
+                             : (data.textSettings.message || currentContent.message);
+
         copy[activeIndex] = {
-            ...copy[activeIndex],
-            message: data.textSettings.message || copy[activeIndex].message,
+            ...currentContent,
+            message: messageToUse,
             showButton: data.buttonSettings.isSelected,
             buttonText: data.buttonSettings.content || 'Click Here',
             showCountdown: data.countdownSettings.isSelected,
@@ -1499,7 +1511,6 @@ function CreateBarPage() {
                           )}
                           <Select label="Animation" options={animationOptions} value={contents[0]?.animationType || 'bounce'} onChange={handleDesignAnimationChange} />
                           
-                          {/* STICKY TOGGLE & POSITION */}
                           <BlockStack gap="200">
                             <Text variant="headingSm" as="h3">Bar Position</Text>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
