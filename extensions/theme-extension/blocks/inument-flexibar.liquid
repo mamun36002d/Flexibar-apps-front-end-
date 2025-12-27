@@ -1,4 +1,3 @@
-
 {% schema %}
 {
   "name": "Flexibar",
@@ -7,368 +6,360 @@
     {
       "type": "checkbox",
       "id": "enabled",
-      "label": "Enable embed",
+      "label": "Enable Flexibar",
       "default": true
     }
   ]
 }
 {% endschema %}
 
-{% if block.settings.enabled %}
-<link href="https://fonts.googleapis.com/css2?family=Rock+3D&family=Madimi+One&family=Angkor&family=Josefin+Sans&family=Josefin+Slab&family=Roboto&family=Lobster&family=Open+Sans&family=Crafty+Girls&family=Mystery+Quest&family=Montserrat&family=Raleway&family=Anton&family=Encode+Sans+Expanded&display=swap" rel="stylesheet">
-{{ 'flexibar-v3.css' | asset_url | stylesheet_tag }}
+{% if settings.enabled != false %}
+  {% assign flexi_raw = shop.metafields.flexibar.settings.value %}
 
-{% assign storedomain = shop.permanent_domain | split: '.' | first %}
+  {% if flexi_raw != blank %}
+    {% assign fs = flexi_raw.settings %}
+    {% assign fc = flexi_raw.contents %}
+    {% assign bar_type = fs.type | default: 'single' %}
+    {% assign first_item = fc | first %}
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Madimi+One&family=Montserrat:wght@400;700&family=Open+Sans:wght@400;700&family=Poppins:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-
-    if (window.flexibarFetching) return;
-    window.flexibarFetching = true;
-
-    function checkDeviceType(targetedDevice) {
-      if (!targetedDevice || targetedDevice === "all") return true;
-
-      const userAgent = navigator.userAgent.toLowerCase();
-
-      const isIPad = /ipad/.test(userAgent);
-      const isAndroid = /android/.test(userAgent);
-      const isMobile = /mobi|iphone|ipod|android/.test(userAgent);
-      const isTablet = isIPad || (isAndroid && !/mobile/.test(userAgent));
-      const isDesktop = !isMobile && !isTablet;
-
-      const activeDevice = isDesktop
-        ? "desktop"
-        : isTablet
-        ? "tablet"
-        : isMobile
-        ? "mobile"
-        : "unknown";
-
-      const allowedDevices = targetedDevice.toLowerCase().split(",").map((d) => d.trim());
-
-      return allowedDevices.includes(activeDevice);
-    }
-
-    function getTimeRemaining(targetDateTime) {
-      const now = new Date();
-      const diff = targetDateTime - now;
-
-      if (diff <= 0) {
-        return { days: "00", hours: "00", minutes: "00", seconds: "00", isExpired: true };
+    <style>
+      :root {
+        --fb-font: {% case fs.fontFamily %}
+          {% when 'poppins' %}'Poppins', sans-serif
+          {% when 'roboto' %}'Roboto', sans-serif
+          {% when 'openSans' %}'Open Sans', sans-serif
+          {% when 'montserrat' %}'Montserrat', sans-serif
+          {% when 'madimi one' %}'Madimi One', cursive
+          {% when 'system' %}system-ui, -apple-system, sans-serif
+          {% else %}'Inter', sans-serif
+        {% endcase %};
+        --fb-color: {{ fs.fontColor | default: '#FFFFFF' }};
+        --fb-size: {% if fs.fontSize == 'small' %}13px{% elsif fs.fontSize == 'large' %}17px{% else %}15px{% endif %};
+        --fb-weight: {% if fs.isBold %}700{% else %}400{% endif %};
+        --fb-bg: {% if fs.backgroundType == 'gradient' %}linear-gradient({{ fs.gradientAngle | default: 90 }}deg, {{ fs.gradientColorFrom | default: '#e1195e' }}, {{ fs.gradientColorTo | default: '#e45c29' }}){% else %}{{ fs.barBgColor | default: '#4F46E5' }}{% endif %};
       }
 
-      const seconds = String(Math.floor((diff / 1000) % 60)).padStart(2, "0");
-      const minutes = String(Math.floor((diff / 1000 / 60) % 60)).padStart(2, "0");
-      const hours = String(Math.floor((diff / (1000 * 60 * 60)) % 24)).padStart(2, "0");
-      const days = String(Math.floor(diff / (1000 * 60 * 60 * 24))).padStart(2, "0");
+      @keyframes fb-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+      @keyframes fb-fadeIn { 0% { opacity: 0; } 100% { opacity: 1; } }
+      @keyframes fb-slideDown { 0% { opacity: 0; transform: translateY(-20px); } 100% { opacity: 1; transform: translateY(0); } }
+      @keyframes fb-pulse { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } }
+      @keyframes fb-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
 
-      return { days, hours, minutes, seconds, isExpired: false };
-    }
-
-    function startCountdownTimer(containerId, targetDateTime, template, style) {
-      const el = document.getElementById(containerId);
-      if (!el) return;
-
-      let timer; // <-- Declare timer here
-
-      const updateClock = () => {
-        const time = getTimeRemaining(targetDateTime);
-        
-        const html = template.html
-          .replace(/{% raw %}{{name}}{% endraw %}/g, template.name)
-          .replace(/{% raw %}{{days}}{% endraw %}/g, time.days)
-          .replace(/{% raw %}{{hours}}{% endraw %}/g, time.hours)
-          .replace(/{% raw %}{{minutes}}{% endraw %}/g, time.minutes)
-          .replace(/{% raw %}{{seconds}}{% endraw %}/g, time.seconds)
-          .replace(/{% raw %}{{color}}{% endraw %}/g, style.color)
-          .replace(/{% raw %}{{background}}{% endraw %}/g, style.background)
-          .replace(/{% raw %}{{shadow}}{% endraw %}/g, style.shadow)
-          .replace(/{% raw %}{{fontFamily}}{% endraw %}/g, style.fontFamily)
-          .replace(/{% raw %}{{fontSize}}{% endraw %}/g, style.fontSize)
-          .replace(/{% raw %}{{fontWeight}}{% endraw %}/g, style.fontWeight);
-
-        el.innerHTML = html;
-
-        if (time.isExpired) {
-          clearInterval(timer);
-          return;
-        }
-      };
-
-      timer = setInterval(updateClock, 1000);
-      updateClock();
-    }
-
-
-    function reactStyleToCSS(styleObj) {
-      const kebab = str => str.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
-      const lines = Object.entries(styleObj).map(([key, value]) => {
-        return `  ${kebab(key)}: ${value};`;
-      });
-      return `\n${lines.join('\n')}\n`;
-    }
-
-    function showSlide(slides, index) {
-      slides.forEach((slide, i) => {
-        slide.classList.remove('active');
-      });
-      slides[index].classList.add('active');
-    }
-
-    function startSlideShow(slides) {
-      let currentIndex = 0;
-      const duration = 3000;
-      setInterval(() => {
-        currentIndex = (currentIndex + 1) % slides.length;
-        showSlide(slides, currentIndex);
-      }, duration);
-    }
-
-    function getBrowserZone() {
-      const offset = new Date().getTimezoneOffset(); // e.g. -360 for UTC+6
-      const sign = offset <= 0 ? "+" : "-";
-      const abs = Math.abs(offset);
-      const hours = String(Math.floor(abs / 60)).padStart(2, "0");
-      const minutes = String(abs % 60).padStart(2, "0");
-      return `${sign}${hours}:${minutes}`;
-    };
-
-    function parseWithZone(dateStr, timeStr, zoneOffset) {
-      if (!dateStr || !timeStr || !zoneOffset) return null;
-
-      // Extract hours, minutes
-      const [hours, minutes] = timeStr.split(":").map(Number);
-      const [year, month, day] = dateStr.split("-").map(Number);
-
-      // Create base date in UTC
-      const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes));
-
-      // Apply timezone offset in milliseconds
-      const [, sign, hh, mm] = zoneOffset.match(/([+-])(\d{2}):(\d{2})/) || [];
-      const offsetMinutes = parseInt(hh) * 60 + parseInt(mm);
-      const offsetMs = offsetMinutes * 60 * 1000;
-
-      return new Date(utcDate.getTime() + (sign === "+" ? -offsetMs : offsetMs));
-    }
-
-    async function parseAnnouncementData() {
-
-      try {
-        const res = await fetch('{{ "api-response.json" | asset_url }}');
-        const json = await res.json();
-        const data = json?.data;
-        console.log('Fetched announcement data:', data);
-        if (!data) {
-          return [];
-        }
-
-        // Parse announcement settings
-        const announcementSettings = data.announcementSettings || {};
-
-        // Parse and map each bar setting
-        const barSettings = (data.barSettings || []).map((barSettingStr) => {
-          try {
-            return {
-              barSettings: barSettingStr.barSettings,
-              barId: barSettingStr.barId
-            };
-          } catch (e) {
-            console.warn("Invalid JSON in barSetting:", barSettingStr);
-            return null;
-          }
-        }).filter(Boolean); // remove any nulls from failed JSON parsing
-
-        // Final structured object
-        const parsedResult = {
-          title: data.title,
-          barSettings,
-          announcementSettings,
-          barMessageTranslations: data?.barMessageTranslations || [],
-          scheduleType: data.scheduleType,
-          scheduleDays: data.scheduleDays,
-          startDate: data.startDate,
-          endDate: data.endDate,
-          isSchedule: data.isSchedule,
-          countryCode: `{{ localization.country.iso_code }}`,
-          languageCode: `{{ localization.language.iso_code }}`,
-        };
-        return parsedResult;
-      } catch (error) {
-        console.error("Failed to fetch or parse announcement data:", error);
-        return [];
+      /* ===== MAIN BAR ===== */
+      .fb-bar {
+        width: 100%;
+        padding: 12px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        box-sizing: border-box;
+        z-index: 999999;
+        overflow: hidden;
+        font-family: var(--fb-font);
+        color: var(--fb-color);
+        font-size: var(--fb-size);
+        font-weight: var(--fb-weight);
+        background: var(--fb-bg);
+        line-height: 1.4;
+        {% if fs.barPosition contains 'sticky' %}
+          position: fixed !important;
+          left: 0;
+          right: 0;
+          {% if fs.barPosition contains 'top' %}top: 0;{% else %}bottom: 0;{% endif %}
+        {% else %}
+          position: relative;
+        {% endif %}
+        {% case fs.barAnimation %}
+          {% when 'bounce' %}animation: fb-bounce 1.5s ease-in-out infinite;
+          {% when 'fade' %}animation: fb-fadeIn 0.8s ease-out forwards;
+          {% when 'slideDown' %}animation: fb-slideDown 0.6s ease-out forwards;
+          {% when 'pulse' %}animation: fb-pulse 2s ease-in-out infinite;
+        {% endcase %}
       }
-    }
 
-    parseAnnouncementData().then(announcementDetails => {
-      if (announcementDetails && announcementDetails.barSettings) {
-        
-        
-        // Once the data is fetched, inject dynamic conditions for showing the bar
-        const announcementSettings = announcementDetails?.announcementSettings;
-        const scheduleDays = announcementDetails?.scheduleDays ? announcementDetails?.scheduleDays.split(',') : [];
-        const scheduleType = announcementDetails?.scheduleType;
-        const currentDay = new Date().toLocaleString('en-us', { weekday: 'long' });
-        const startDate = announcementDetails?.startDate?.date;
-        const endDate = announcementDetails?.endDate?.date;
-        const startTime = announcementDetails?.startDate?.time;
-        const endTime = announcementDetails?.endDate?.time;
-        const countryCode = announcementDetails.countryCode;
-        const languageCode = announcementDetails.languageCode;
-        const barMessageTranslations = announcementDetails.barMessageTranslations;
+      {% if fs.barPosition contains 'sticky' and fs.barPosition contains 'top' %}
+        body { padding-top: 52px !important; }
+      {% elsif fs.barPosition contains 'sticky' and fs.barPosition contains 'bottom' %}
+        body { padding-bottom: 52px !important; }
+      {% endif %}
 
-        const currentDate = new Date();
-        const zone = getBrowserZone();
+      /* ===== MARQUEE ===== */
+      .fb-bar.fb-marquee {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        gap: 0;
+        padding-right: 16px;
+      }
 
-        const startDateTime = parseWithZone(startDate, startTime, zone);
-        const endDateTime = parseWithZone(endDate, endTime, zone);
+      .fb-marquee-wrap {
+        flex: 1;
+        overflow: hidden;
+        position: relative;
+        mask-image: linear-gradient(to right, transparent, black 15px, black calc(100% - 15px), transparent);
+        -webkit-mask-image: linear-gradient(to right, transparent, black 15px, black calc(100% - 15px), transparent);
+      }
 
+      .fb-marquee-track {
+        display: inline-flex;
+        align-items: center;
+        white-space: nowrap;
+        animation: fb-scroll var(--marquee-speed, 25s) linear infinite;
+      }
 
-        // 1. Check if the country code matches any of the keywords
-        const countries = announcementSettings?.countries || [];
-        const isCountryAllowed = !countries.length ? true : countries.some(country => country === countryCode);
+      .fb-marquee-track:hover { animation-play-state: paused; }
 
-        // 2. Check if today is within the schedule days
-        const isDayAllowed = (scheduleType !== 'Repeat') ? true : scheduleDays.includes(currentDay);
+      .fb-marquee-item { display: inline-flex; align-items: center; padding: 0 24px; }
 
-        // 3. Check if today's date is within the start and end date range
-        const isDateInRange =
-          (!startDateTime || !endDateTime)
-            ? true
-            : currentDate >= startDateTime && currentDate <= endDateTime;
-            
-        // 4. Check if the device is the correct type (desktop, mobile, etc.)
-        const targetedDevice = announcementSettings?.targetedDevice || '';
-        const isDeviceAllowed = checkDeviceType(targetedDevice);
+      .fb-marquee-dot {
+        width: 6px;
+        height: 6px;
+        background: currentColor;
+        border-radius: 50%;
+        opacity: 0.5;
+        flex-shrink: 0;
+      }
 
-        // 5. Check if the page is allowed for this announcement
-        const allowedPages = announcementSettings?.pages.map((page) => {
-          page = page.toLowerCase()
-          page = page == 'home' ? 'index' : page
-          return page
-        }) || [];
-        const isPageAllowed = announcementSettings?.pages.length ? allowedPages.includes("{{template.name}}") || allowedPages.includes("{{page_title | downcase}}") : true;
+      /* ===== ACTIONS ===== */
+      .fb-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+        padding-left: 12px;
+        position: relative;
+        z-index: 10;
+      }
 
-        if (isPageAllowed && isCountryAllowed && isDayAllowed && isDateInRange && isDeviceAllowed) {
-          console.log('rendering logic passed')
-        } else {
-          console.log('rendering logic failed', {isPageAllowed , isCountryAllowed, isDayAllowed , isDateInRange , isDeviceAllowed})
-          return;
+      /* ===== COUNTDOWN ===== */
+      .fb-countdown { display: flex; align-items: center; gap: 4px; }
+
+      .fb-cd-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 4px 8px;
+        border-radius: 6px;
+        min-width: 36px;
+        text-align: center;
+      }
+
+      .fb-cd-val { font-weight: 700; font-size: 1em; line-height: 1.2; }
+      .fb-cd-lbl { font-size: 0.6em; opacity: 0.9; text-transform: lowercase; line-height: 1; margin-top: 2px; }
+
+      /* ===== BUTTON ===== */
+      .fb-btn {
+        border: none;
+        padding: 8px 16px;
+        cursor: pointer;
+        white-space: nowrap;
+        text-decoration: none !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-family: inherit;
+        font-size: inherit;
+        font-weight: inherit;
+        transition: all 0.2s ease;
+      }
+
+      .fb-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+      .fb-btn.anim-bounce { animation: fb-bounce 1.5s ease-in-out infinite; }
+      .fb-btn.anim-pulse { animation: fb-pulse 2s ease-in-out infinite; }
+
+      .fb-link { margin-left: 6px; cursor: pointer; font-size: inherit; font-weight: inherit; }
+      .fb-link:hover { opacity: 0.8; }
+
+      /* ===== SLIDER ===== */
+      .fb-bar.fb-slider { position: relative; justify-content: center; }
+      .fb-slides { display: flex; align-items: center; justify-content: center; width: 100%; }
+      .fb-slide { display: none; align-items: center; justify-content: center; gap: 16px; width: 100%; }
+      .fb-slide.active { display: flex; }
+
+      .fb-nav {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.95);
+        border: none;
+        cursor: pointer;
+        z-index: 10;
+        font-size: 16px;
+        color: #333;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      }
+
+      .fb-nav:hover { background: #fff; }
+      .fb-nav.prev { left: 10px; }
+      .fb-nav.next { right: 10px; }
+
+      .fb-bar.fb-single { justify-content: center; }
+
+      /* ===== MOBILE RESPONSIVE - SAME AS APP PREVIEW ===== */
+      @media (max-width: 768px) {
+        .fb-bar {
+          padding: 10px 12px !important;
+          gap: 8px !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: center !important;
+          text-align: center !important;
         }
 
+        /* Marquee mobile - 2 rows */
+        .fb-bar.fb-marquee {
+          flex-direction: column !important;
+          padding-right: 12px !important;
+        }
 
-        const totalBarsCount = announcementDetails.barSettings.length;
-        const barTranslations = announcementDetails?.barMessageTranslations || [];
+        .fb-marquee-wrap {
+          width: 100% !important;
+          margin-bottom: 8px;
+        }
 
-        for (const {barId, barSettings} of announcementDetails.barSettings) {
-          const { barDesignSettings, buttonSettings, countdownSettings, textSettings } = barSettings;
+        .fb-actions {
+          width: auto !important;
+          justify-content: center !important;
+          padding-left: 0 !important;
+          margin-top: 4px;
+          flex-wrap: nowrap !important;
+        }
 
-          barDesignSettings.style.width = barDesignSettings.style.width + '%';
-          barDesignSettings.style.height = 'auto';
-          barDesignSettings.style.padding = barDesignSettings.style.padding + 'px';
-          barDesignSettings.style.borderWidth = barDesignSettings.style.borderWidth + 'px';
-          barDesignSettings.style.borderRadius = barDesignSettings.style.borderRadius + 'px';
-          barDesignSettings.style.justifyContent = barDesignSettings.style.justifyContent  == null ? 'normal' : barDesignSettings.style.justifyContent;
-          barDesignSettings.style.marginLeft = barDesignSettings.style.marginLeft + '%';
-          barDesignSettings.style.cursor = barDesignSettings.clickable ? "pointer" : 'default';
-          
-          textSettings.style.fontSize = textSettings.style.fontSize + 'px';
+        .fb-cd-item {
+          min-width: 32px !important;
+          padding: 3px 6px !important;
+        }
 
-          buttonSettings.style.borderRadius = buttonSettings.style.borderRadius + 'px';
+        .fb-cd-val { font-size: 0.9em !important; }
+        .fb-cd-lbl { font-size: 0.55em !important; }
 
-          const { animation, ...btnStyle } = buttonSettings.style;
+        .fb-btn {
+          padding: 6px 14px !important;
+          font-size: 0.9em !important;
+        }
 
-          const redirectUrl = barDesignSettings.clickable ? barDesignSettings.redirectUrl : '';
+        /* Slider mobile */
+        .fb-slide {
+          flex-direction: column !important;
+          gap: 8px !important;
+        }
 
-          const hasValidCountdown =
-            countdownSettings?.isSelected &&
-            countdownSettings.targetDate.date &&
-            countdownSettings.targetDate.time;
+        /* Single mobile */
+        .fb-bar.fb-single {
+          flex-direction: column !important;
+        }
 
-          const targetDateTime = hasValidCountdown
-            ? parseWithZone(countdownSettings.targetDate.date, countdownSettings.targetDate.time, zone)
-            : null;
+        {% if fs.barPosition contains 'sticky' and fs.barPosition contains 'top' %}
+          body { padding-top: 80px !important; }
+        {% elsif fs.barPosition contains 'sticky' and fs.barPosition contains 'bottom' %}
+          body { padding-bottom: 80px !important; }
+        {% endif %}
+      }
 
-          const timeParts = hasValidCountdown ? getTimeRemaining(targetDateTime) : {};
+      /* Tablet */
+      @media (min-width: 769px) and (max-width: 1024px) {
+        .fb-bar { padding: 11px 16px; gap: 12px; }
+        .fb-cd-item { min-width: 34px; padding: 3px 7px; }
+      }
+    </style>
 
-          const countdownId = `countdown-${Math.random().toString(36).substr(2, 9)}`;
-
-          const countdownHTML = hasValidCountdown
-            ? `<span id="${countdownId}"></span>`
-            : "";
-
-          let rootMessage = textSettings.message;
-
-          if (barMessageTranslations.length) {
-            const translatedMessage = barMessageTranslations.find(
-              translation => translation.barId === barId && translation.languageCode === (languageCode.includes('-') ?  languageCode.split('-')[0] : languageCode)
-            );
-            if (translatedMessage) {
-              rootMessage = translatedMessage.translationMessage;
-            }
-          }
-
-          const message = rootMessage + (hasValidCountdown ? countdownHTML : "");
-
-          const totalHTML = `
-            <div 
-              data-url="${redirectUrl || ''}" 
-              style="${reactStyleToCSS(barDesignSettings.style)}" 
-              class="${barDesignSettings.animation || ''} ${barDesignSettings.position || ''} flexibar-redirect-area ${totalBarsCount > 1 ? 'flexibar-slideshow-slide' : ''}">
-              
-              <span 
-                style="${reactStyleToCSS(textSettings.style)}; width: 100%;">
-                ${message}
-              </span>
-
-              ${buttonSettings.isSelected ? `
-                <a href="${buttonSettings.href || '#'}" target="_blank">
-                  <button 
-                    class="${animation}" 
-                    style="${reactStyleToCSS(btnStyle)}; cursor: pointer; width: max-content; padding: 5px; font-size: 15px; margin-left: 10px; border-color: transparent;">
-                    ${buttonSettings.content}
-                  </button>
-                </a>
-              ` : ''}
+    {% comment %} ====== SINGLE ====== {% endcomment %}
+    {% if bar_type == 'single' %}
+      {% if first_item %}
+        <div class="fb-bar fb-single" id="flexibar">
+          <span class="fb-msg">
+            {{ first_item.message }}
+            {% if first_item.hasLink %}
+              <a href="{{ first_item.linkUrl }}" class="fb-link" style="color: {{ first_item.linkColor | default: '#fff' }}; text-decoration: {% if first_item.linkUnderline %}underline{% else %}none{% endif %};" target="{% if first_item.linkNewTab %}_blank{% else %}_self{% endif %}">{{ first_item.linkText }}</a>
+            {% endif %}
+          </span>
+          {% if first_item.showCountdown or first_item.showButton %}
+            <div class="fb-actions">
+              {% if first_item.showCountdown %}
+                <div class="fb-countdown" data-date="{{ first_item.targetDate }}" data-hour="{{ first_item.targetTimeH }}" data-min="{{ first_item.targetTimeM }}" data-ampm="{{ first_item.targetTimeAmPm }}">
+                  {% if first_item.countdownShowDays != false %}
+                    <div class="fb-cd-item" style="background: {{ first_item.countdownBgColor | default: '#FA4150' }}; color: {{ first_item.countdownTextColor | default: '#fff' }};"><span class="fb-cd-val" data-d>00</span>{% if first_item.countdownShowLabels != false %}<span class="fb-cd-lbl">d</span>{% endif %}</div>
+                  {% endif %}
+                  <div class="fb-cd-item" style="background: {{ first_item.countdownBgColor | default: '#FA4150' }}; color: {{ first_item.countdownTextColor | default: '#fff' }};"><span class="fb-cd-val" data-h>00</span>{% if first_item.countdownShowLabels != false %}<span class="fb-cd-lbl">h</span>{% endif %}</div>
+                  <div class="fb-cd-item" style="background: {{ first_item.countdownBgColor | default: '#FA4150' }}; color: {{ first_item.countdownTextColor | default: '#fff' }};"><span class="fb-cd-val" data-m>00</span>{% if first_item.countdownShowLabels != false %}<span class="fb-cd-lbl">m</span>{% endif %}</div>
+                  <div class="fb-cd-item" style="background: {{ first_item.countdownBgColor | default: '#FA4150' }}; color: {{ first_item.countdownTextColor | default: '#fff' }};"><span class="fb-cd-val" data-s>00</span>{% if first_item.countdownShowLabels != false %}<span class="fb-cd-lbl">s</span>{% endif %}</div>
+                </div>
+              {% endif %}
+              {% if first_item.showButton %}
+                <a href="{{ first_item.buttonUrl | default: '#' }}" class="fb-btn {% if first_item.buttonAnimation == 'bounce' %}anim-bounce{% elsif first_item.buttonAnimation == 'pulse' %}anim-pulse{% endif %}" style="background: {{ first_item.btnBgColor | default: '#FA4150' }}; color: {{ first_item.btnTextColor | default: '#fff' }}; border-radius: {{ first_item.buttonRadius | default: 5 }}px;">{{ first_item.buttonText | default: 'Shop Now' }}</a>
+              {% endif %}
             </div>
-          `;
+          {% endif %}
+        </div>
+      {% endif %}
 
+    {% comment %} ====== SLIDER ====== {% endcomment %}
+    {% elsif bar_type == 'multiple' %}
+      <div class="fb-bar fb-slider" id="flexibar">
+        {% if fs.showSliderArrows %}
+          <button class="fb-nav prev" onclick="fbPrev()">‹</button>
+          <button class="fb-nav next" onclick="fbNext()">›</button>
+        {% endif %}
+        <div class="fb-slides">
+          {% for item in fc %}
+            <div class="fb-slide {% if forloop.first %}active{% endif %}">
+              <span class="fb-msg">{{ item.message }}{% if item.hasLink %}<a href="{{ item.linkUrl }}" class="fb-link" style="color: {{ item.linkColor | default: '#fff' }}; text-decoration: {% if item.linkUnderline %}underline{% else %}none{% endif %};" target="{% if item.linkNewTab %}_blank{% else %}_self{% endif %}">{{ item.linkText }}</a>{% endif %}</span>
+              {% if item.showCountdown or item.showButton %}
+                <div class="fb-actions">
+                  {% if item.showCountdown %}
+                    <div class="fb-countdown" data-date="{{ item.targetDate }}" data-hour="{{ item.targetTimeH }}" data-min="{{ item.targetTimeM }}" data-ampm="{{ item.targetTimeAmPm }}">
+                      {% if item.countdownShowDays != false %}<div class="fb-cd-item" style="background: {{ item.countdownBgColor | default: '#FA4150' }}; color: {{ item.countdownTextColor | default: '#fff' }};"><span class="fb-cd-val" data-d>00</span>{% if item.countdownShowLabels != false %}<span class="fb-cd-lbl">d</span>{% endif %}</div>{% endif %}
+                      <div class="fb-cd-item" style="background: {{ item.countdownBgColor | default: '#FA4150' }}; color: {{ item.countdownTextColor | default: '#fff' }};"><span class="fb-cd-val" data-h>00</span>{% if item.countdownShowLabels != false %}<span class="fb-cd-lbl">h</span>{% endif %}</div>
+                      <div class="fb-cd-item" style="background: {{ item.countdownBgColor | default: '#FA4150' }}; color: {{ item.countdownTextColor | default: '#fff' }};"><span class="fb-cd-val" data-m>00</span>{% if item.countdownShowLabels != false %}<span class="fb-cd-lbl">m</span>{% endif %}</div>
+                      <div class="fb-cd-item" style="background: {{ item.countdownBgColor | default: '#FA4150' }}; color: {{ item.countdownTextColor | default: '#fff' }};"><span class="fb-cd-val" data-s>00</span>{% if item.countdownShowLabels != false %}<span class="fb-cd-lbl">s</span>{% endif %}</div>
+                    </div>
+                  {% endif %}
+                  {% if item.showButton %}<a href="{{ item.buttonUrl | default: '#' }}" class="fb-btn {% if item.buttonAnimation == 'bounce' %}anim-bounce{% elsif item.buttonAnimation == 'pulse' %}anim-pulse{% endif %}" style="background: {{ item.btnBgColor | default: '#FA4150' }}; color: {{ item.btnTextColor | default: '#fff' }}; border-radius: {{ item.buttonRadius | default: 5 }}px;">{{ item.buttonText | default: 'Shop Now' }}</a>{% endif %}
+                </div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+      <script>(function(){var cur=0,slides=document.querySelectorAll('.fb-slide'),total=slides.length,dur={{ fs.slideDuration | default: 3 }}*1000,timer;function show(i){slides.forEach(function(s,idx){s.classList.toggle('active',idx===i);});}function next(){cur=(cur+1)%total;show(cur);}function prev(){cur=(cur-1+total)%total;show(cur);}function start(){timer=setInterval(next,dur);}window.fbNext=function(){clearInterval(timer);next();start();};window.fbPrev=function(){clearInterval(timer);prev();start();};start();})();</script>
 
-          switch (barDesignSettings.position) {
-            case 'top':
-            case 'sticky-top':
-              document.body.insertAdjacentHTML('afterbegin', totalHTML);
-              break;
-            case 'bottom':
-            case 'sticky-bottom':
-              document.body.insertAdjacentHTML('beforeend', totalHTML);
-              break;
-          }
+    {% comment %} ====== MARQUEE ====== {% endcomment %}
+    {% elsif bar_type == 'running' %}
+      {% assign count = fc | size %}
+      {% assign speed = count | times: 10 | plus: 15 %}
+      <div class="fb-bar fb-marquee" id="flexibar" style="--marquee-speed: {{ speed }}s;">
+        <div class="fb-marquee-wrap">
+          <div class="fb-marquee-track">
+            {% for copy in (1..2) %}{% for item in fc %}<span class="fb-marquee-item">{{ item.message }}</span><span class="fb-marquee-dot"></span>{% endfor %}{% endfor %}
+          </div>
+        </div>
+        {% if first_item.showCountdown or first_item.showButton %}
+          <div class="fb-actions">
+            {% if first_item.showCountdown %}
+              <div class="fb-countdown" data-date="{{ first_item.targetDate }}" data-hour="{{ first_item.targetTimeH }}" data-min="{{ first_item.targetTimeM }}" data-ampm="{{ first_item.targetTimeAmPm }}">
+                {% if first_item.countdownShowDays != false %}<div class="fb-cd-item" style="background: {{ first_item.countdownBgColor | default: '#FA4150' }}; color: {{ first_item.countdownTextColor | default: '#fff' }};"><span class="fb-cd-val" data-d>00</span>{% if first_item.countdownShowLabels != false %}<span class="fb-cd-lbl">d</span>{% endif %}</div>{% endif %}
+                <div class="fb-cd-item" style="background: {{ first_item.countdownBgColor | default: '#FA4150' }}; color: {{ first_item.countdownTextColor | default: '#fff' }};"><span class="fb-cd-val" data-h>00</span>{% if first_item.countdownShowLabels != false %}<span class="fb-cd-lbl">h</span>{% endif %}</div>
+                <div class="fb-cd-item" style="background: {{ first_item.countdownBgColor | default: '#FA4150' }}; color: {{ first_item.countdownTextColor | default: '#fff' }};"><span class="fb-cd-val" data-m>00</span>{% if first_item.countdownShowLabels != false %}<span class="fb-cd-lbl">m</span>{% endif %}</div>
+                <div class="fb-cd-item" style="background: {{ first_item.countdownBgColor | default: '#FA4150' }}; color: {{ first_item.countdownTextColor | default: '#fff' }};"><span class="fb-cd-val" data-s>00</span>{% if first_item.countdownShowLabels != false %}<span class="fb-cd-lbl">s</span>{% endif %}</div>
+              </div>
+            {% endif %}
+            {% if first_item.showButton %}<a href="{{ first_item.buttonUrl | default: '#' }}" class="fb-btn {% if first_item.buttonAnimation == 'bounce' %}anim-bounce{% elsif first_item.buttonAnimation == 'pulse' %}anim-pulse{% endif %}" style="background: {{ first_item.btnBgColor | default: '#FA4150' }}; color: {{ first_item.btnTextColor | default: '#fff' }}; border-radius: {{ first_item.buttonRadius | default: 5 }}px;">{{ first_item.buttonText | default: 'Shop Now' }}</a>{% endif %}
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
 
-          document.querySelectorAll('.flexibar-redirect-area').forEach(btn => {
-            btn.addEventListener('click', () => {
-              const redirectUrl = btn.getAttribute('data-url');
-              if (redirectUrl && redirectUrl != '' && barDesignSettings.clickable) window.open(redirectUrl, '_blank');
-            });
-          });
-
-          if (hasValidCountdown) {
-            startCountdownTimer(
-              countdownId,
-              targetDateTime,
-              countdownSettings.template,
-              countdownSettings.style
-            );
-          }
-        }
-        
-        if (totalBarsCount > 1) {
-          startSlideShow(document.querySelectorAll('.flexibar-slideshow-slide'));
-        }
-
-      }
-    });
-  });
-</script>
+    <script>(function(){function pad(n){return n<10?'0'+n:n;}function parse(el){var d=el.getAttribute('data-date'),h=parseInt(el.getAttribute('data-hour')||'0',10),m=parseInt(el.getAttribute('data-min')||'0',10),ap=el.getAttribute('data-ampm')||'PM';if(!d)return null;var p=d.split('-');if(p.length!==3)return null;if(ap==='PM'&&h<12)h+=12;if(ap==='AM'&&h===12)h=0;return new Date(parseInt(p[0],10),parseInt(p[1],10)-1,parseInt(p[2],10),h,m,0,0);}function update(){document.querySelectorAll('.fb-countdown').forEach(function(el){var t=parse(el);if(!t)return;var diff=t.getTime()-Date.now(),days=0,hrs=0,mins=0,secs=0;if(diff>0){days=Math.floor(diff/86400000);diff%=86400000;hrs=Math.floor(diff/3600000);diff%=3600000;mins=Math.floor(diff/60000);diff%=60000;secs=Math.floor(diff/1000);}var de=el.querySelector('[data-d]'),he=el.querySelector('[data-h]'),me=el.querySelector('[data-m]'),se=el.querySelector('[data-s]');if(de)de.textContent=pad(days);if(he)he.textContent=pad(hrs);if(me)me.textContent=pad(mins);if(se)se.textContent=pad(secs);});} update();setInterval(update,1000);})();</script>
+  {% else %}
+    <!-- Flexibar: No settings -->
+  {% endif %}
 {% endif %}

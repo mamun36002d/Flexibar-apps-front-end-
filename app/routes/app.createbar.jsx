@@ -10,6 +10,13 @@ import { MagicIcon, LanguageIcon, LinkIcon, DesktopIcon, TabletIcon, MobileIcon,
 import { PREDEFINED_TEMPLATES } from '../data/barTemplates';
 import { countdownTemplates } from '../data/countdownTemplates';
 
+import { useFetcher } from 'react-router-dom';
+
+
+
+
+
+
 // -------- Constants ----------
 const animationOptions = [
   { label: 'None', value: 'none' },
@@ -258,6 +265,32 @@ const stylesAndAnimations = `
   margin-top: 8px;
 }
 
+/* ===== TABLET PREVIEW (explicit) ===== */
+.flexibar-announcement-bar.is-tablet {
+  padding: 11px 16px;
+  gap: 12px;
+}
+
+.flexibar-announcement-bar.is-tablet.has-arrows {
+  padding-left: 46px;
+  padding-right: 46px;
+}
+
+.flexibar-announcement-bar.is-tablet .flexibar-actions {
+  gap: 10px;
+}
+
+/* ===== DESKTOP PREVIEW (explicit) ===== */
+.flexibar-announcement-bar.is-desktop {
+  padding: 12px 20px;
+  gap: 16px;
+}
+
+.flexibar-announcement-bar.is-desktop.has-arrows {
+  padding-left: 50px;
+  padding-right: 50px;
+}
+
 @media (max-width: 768px) {
   .flexibar-announcement-bar:not(.is-mobile):not(.marquee-mode) {
     flex-direction: column;
@@ -278,7 +311,7 @@ const stylesAndAnimations = `
 }
 `;
 
-// -------- Helper Functions ----------
+
 function hsbToHex({ hue, saturation, brightness }) {
   const h = hue; const s = saturation; const v = brightness; const c = v * s;
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1)); const m = v - c;
@@ -355,13 +388,13 @@ function renderCountdownHtml(templateHtml, data) {
   });
 }
 
-// *** CHANGE 1: Added isMessageDirty to empty content ***
+
 function createEmptyContent(index) {
   return {
     id: `${Date.now()}-${index}`,
     label: `Content ${index}`,
     message: 'NEW COLLECTION LAUNCHED. 20% Flat Discount.',
-    isMessageDirty: false, // NEW: track if user manually edited
+    isMessageDirty: false, 
     showButton: true,
     buttonText: 'Shop Now',
     buttonUrl: '',
@@ -392,7 +425,7 @@ function createEmptyContent(index) {
   };
 }
 
-// -------- Components ----------
+
 
 const CustomSelect = ({ label, options, value, onChange }) => {
   const [active, setActive] = useState(false);
@@ -560,14 +593,15 @@ const TheBar = ({
 
   const fontFamilyValue = getFontFamilyString(fontFamily);
 
-  const mobileClass = viewMode === 'mobile' ? 'is-mobile' : '';
+  const deviceClass = viewMode === 'mobile' ? 'is-mobile' : (viewMode === 'tablet' ? 'is-tablet' : 'is-desktop');
   const marqueeClass = isMarqueeMode ? 'marquee-mode' : '';
   const arrowClass = hasArrowNavigation ? 'has-arrows' : '';
 
-  const globalFontSize = fontSize === 'small' ? '13px' : fontSize === 'large' ? '17px' : '15px';
-  const numericFontSize = fontSize === 'small' ? 13 : fontSize === 'large' ? 17 : 15;
-  const globalFontWeight = isBold ? 700 : 400;
-
+  const baseNumericFontSize = fontSize === 'small' ? 13 : fontSize === 'large' ? 17 : 15;
+const deviceScale = viewMode === 'mobile' ? 0.92 : (viewMode === 'tablet' ? 0.96 : 1);
+const numericFontSize = Math.max(12, Math.round(baseNumericFontSize * deviceScale));
+const globalFontSize = `${numericFontSize}px`;
+const globalFontWeight = isBold ? 700 : 400;
   const selectedTemplateObj = countdownTemplates.find(t => t.value === content.countdownTemplate) || countdownTemplates[0];
     
   const templateData = {
@@ -618,7 +652,7 @@ const TheBar = ({
 
   return (
     <div 
-      className={`flexibar-announcement-bar ${mobileClass} ${marqueeClass} ${arrowClass} ${centerClass}`}
+      className={`flexibar-announcement-bar ${deviceClass} ${marqueeClass} ${arrowClass} ${centerClass}`}
       style={{ 
         background: backgroundStyle, 
         color: fontColor, 
@@ -673,7 +707,7 @@ const TheBar = ({
   );
 };
 
-// --- CLEAN PREVIEW CONTAINER ---
+
 const CleanPreviewContainer = ({
 content, 
   contents,
@@ -871,7 +905,7 @@ content,
     }}>
       <div style={{ 
         width: isMobile ? '375px' : (isTablet ? '768px' : '100%'),
-        maxWidth: isMobile ? '375px' : (isTablet ? '768px' : '100%'),
+        maxWidth: isMobile ? '375px' : (isTablet ? '768px' : '1200px'),
         background: '#FFFFFF', 
         boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', 
         border: '1px solid #E5E7EB', 
@@ -922,15 +956,17 @@ content,
     </div>
   );
 };
-// -------- Main Component ----------
+
 function CreateBarPage() {
+
+  const fetcher = useFetcher();
   const [selectedTab, setSelectedTab] = useState(0);
   const [barName, setBarName] = useState('Winter Sale (17th October 2025)');
   const [template, setTemplate] = useState('none');
   const [barType, setBarType] = useState('single');
   const [contents, setContents] = useState([createEmptyContent(1)]);
-  const [activeIndex, setActiveIndex] = useState(0); // For Editor
-  const [previewIndex, setPreviewIndex] = useState(0); // For Preview Slider
+  const [activeIndex, setActiveIndex] = useState(0); 
+  const [previewIndex, setPreviewIndex] = useState(0); 
   const [previewMode, setPreviewMode] = useState('desktop');
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -1021,7 +1057,7 @@ function CreateBarPage() {
 
   const handleTabChange = useCallback((index) => setSelectedTab(index), []);
 
-  // *** CHANGE 2: Updated updateContentField to set isMessageDirty flag ***
+
   const updateContentField = (index, field, value) => { 
     setContents((prev) => { 
       const copy = [...prev]; 
@@ -1062,7 +1098,7 @@ function CreateBarPage() {
     }
   };
 
-  const handleChangePreviewMode = (mode) => { setPreviewMode(mode); };
+  const handleChangePreviewMode = (mode) => { setPreviewMode(mode); triggerPreviewLoading(); };
   const handleDesignAnimationChange = (val) => setContents(p => p.map(c => ({...c, animationType: val})));
     
   const handlePrevContent = () => {
@@ -1096,69 +1132,136 @@ function CreateBarPage() {
     return barPosition;
   };
 
-  const handlePublish = useCallback(() => {
-    setIsPublishing(true);
-    const settingsPayload = {
-      type: barType,
-      fontFamily, fontColor, fontSize,
-      barPosition: getPositionPayload(),
-      barAnimation: contents[0]?.animationType || 'none',
-      barBackgroundType: backgroundType,
-      barBackgroundColor: barBgColor,
-      barGradient: { angle: gradientAngle, color1: gradientColorFrom, color2: gradientColorTo },
-      countdown: {
-        selected_template: contents[0]?.countdownTemplate || 'template1',
-        textColor: contents[0]?.countdownTextColor || '#ffffff',
-        backgroundColor: contents[0]?.countdownBgColor || 'transparent',
-        shadowColor: 'rgba(0,0,0,0.15)' 
-      },
-      button: {
-        textColor: contents[0]?.btnTextColor || '#ffffff',
-        backgroundColor: contents[0]?.btnBgColor || '#000000',
-        borderRadius: parseInt(contents[0]?.buttonRadius || 5)
-      }
-    };
+const handlePublish = useCallback(() => {
+  setIsPublishing(true);
 
-    const barsPayload = contents.map(content => {
-      let messageHtml = content.message;
-      if (content.hasLink) {
-        const target = content.linkNewTab ? '_blank' : '_self';
-        const underlineClass = content.linkUnderline ? 'link-style-underline' : '';
-        messageHtml += ` <a href="${content.linkUrl}" class="${underlineClass}" style="color: ${content.linkColor}" target="${target}">${content.linkText}</a>`;
-      }
-      let isoTargetDate = null;
-      if (content.targetDate) {
-        const tDate = parseTargetDate(content);
-        if (tDate) isoTargetDate = tDate.toISOString();
-      }
-      return {
-        message: { title: messageHtml },
-        button: { buttonEnabled: content.showButton, text: content.buttonText, url: content.buttonUrl, openWith: "_blank", animation: content.buttonAnimation },
-        countdown: { countdownEnabled: content.showCountdown, targetDate: isoTargetDate }
-      };
-    });
+  // Build the complete payload
+  const settingsPayload = {
+    type: barType,
+    fontFamily,
+    fontColor,
+    fontSize,
+    isBold,
+    barPosition: isSticky ? `sticky-${barPosition}` : barPosition,
+    barAnimation: contents[0]?.animationType || 'none',
+    backgroundType,
+    barBgColor,
+    gradientAngle,
+    gradientColorFrom,
+    gradientColorTo,
+    // Slider settings
+    slideMode,
+    slideDuration,
+    showSliderArrows,
+  };
 
-    const placementPayload = {
-      pages: pageScope === 'entire' ? ['all'] : [],
-      keywords: "",
-      countries: countryScope === 'all' ? [] : selectedCountries,
-      targetedDevice: deviceTarget.includes('all') ? 'all' : deviceTarget
-    };
+  // Build contents array with all necessary data
+  const contentsPayload = contents.map(content => ({
+    id: content.id,
+    label: content.label,
+    message: content.message,
+    // Button
+    showButton: content.showButton,
+    buttonText: content.buttonText,
+    buttonUrl: content.buttonUrl,
+    btnBgColor: content.btnBgColor,
+    btnTextColor: content.btnTextColor,
+    buttonAnimation: content.buttonAnimation,
+    buttonRadius: content.buttonRadius,
+    // Countdown
+    showCountdown: content.showCountdown,
+    targetDate: content.targetDate,
+    targetTimeH: content.targetTimeH,
+    targetTimeM: content.targetTimeM,
+    targetTimeAmPm: content.targetTimeAmPm,
+    countdownTemplate: content.countdownTemplate,
+    countdownBgColor: content.countdownBgColor,
+    countdownTextColor: content.countdownTextColor,
+    countdownShowDays: content.countdownShowDays,
+    countdownShowLabels: content.countdownShowLabels,
+    // Link
+    hasLink: content.hasLink,
+    linkText: content.linkText,
+    linkUrl: content.linkUrl,
+    linkColor: content.linkColor,
+    linkUnderline: content.linkUnderline,
+    linkNewTab: content.linkNewTab,
+  }));
 
-    const finalPayload = {
-      name: barName,
-      settings: settingsPayload,
-      bars: barsPayload,
-      barMessageTranslations: [],
-      placementSettings: placementPayload,
-      isSchedule: schedulingEnabled,
-      startDate: { date: formatDatePayload(startDate), time: formatTimePayload(startHour, startMinute, startAmPm), timeZone: null },
-      endDate: { date: endMode === 'never' ? null : formatDatePayload(endDate), time: endMode === 'never' ? null : formatTimePayload(endHour, endMinute, endAmPm), timeZone: null }
-    };
+  // Placement settings
+  const placementPayload = {
+    deviceTarget: deviceTarget.includes('all') ? ['all'] : deviceTarget,
+    pageScope,
+    pages: pageScope === 'specific' ? {
+      cart: pageCart,
+      collection: pageCollection,
+      checkout: pageCheckout,
+      page1: page1,
+      page2: page2,
+    } : { all: true },
+    countryScope,
+    selectedCountries: countryScope === 'specific' ? selectedCountries : [],
+  };
 
-    console.log("Generated JSON for Backend:", JSON.stringify(finalPayload, null, 2));
-    setTimeout(() => { setIsPublishing(false); console.log("Published Data Ready!"); }, 1000);
-  }, [barName, barType, fontFamily, fontColor, fontSize, isSticky, barPosition, contents, backgroundType, barBgColor, gradientAngle, gradientColorFrom, gradientColorTo, pageScope, countryScope, selectedCountries, deviceTarget, schedulingEnabled, startDate, startHour, startMinute, startAmPm, endMode, endDate, endHour, endMinute, endAmPm]);
+  // Schedule settings
+  const schedulePayload = {
+    enabled: schedulingEnabled,
+    startMode,
+    startDate: startMode === 'date' ? {
+      date: startDate.toISOString().split('T')[0],
+      hour: startHour,
+      minute: startMinute,
+      ampm: startAmPm,
+    } : null,
+    endMode,
+    endDate: endMode === 'date' ? {
+      date: endDate.toISOString().split('T')[0],
+      hour: endHour,
+      minute: endMinute,
+      ampm: endAmPm,
+    } : null,
+  };
+
+  // Final payload
+  const finalPayload = {
+    name: barName,
+    settings: settingsPayload,
+    contents: contentsPayload,
+    placement: placementPayload,
+    schedule: schedulePayload,
+    updatedAt: new Date().toISOString(),
+  };
+
+  console.log("Sending to backend:", JSON.stringify(finalPayload, null, 2));
+
+  fetcher.submit(
+    { data: JSON.stringify(finalPayload) },
+    { method: "POST", action: "/app/save-bar-settings" }
+  );
+
+}, [
+  barName, barType, fontFamily, fontColor, fontSize, isBold,
+  isSticky, barPosition, contents, backgroundType, barBgColor,
+  gradientAngle, gradientColorFrom, gradientColorTo,
+  slideMode, slideDuration, showSliderArrows,
+  deviceTarget, pageScope, pageCart, pageCollection, pageCheckout,
+  page1, page2, countryScope, selectedCountries,
+  schedulingEnabled, startMode, startDate, startHour, startMinute, startAmPm,
+  endMode, endDate, endHour, endMinute, endAmPm, fetcher
+]);
+
+
+useEffect(() => {
+  if (fetcher.state === 'idle' && fetcher.data) {
+    setIsPublishing(false);
+    if (fetcher.data.success) {
+      console.log("✅ Published successfully!");
+      
+    } else {
+      console.error("❌ Publish failed:", fetcher.data.error);
+    }
+  }
+}, [fetcher.state, fetcher.data]);
 
   const handleDiscard = useCallback(() => { console.log("Discard clicked"); }, []);
 
